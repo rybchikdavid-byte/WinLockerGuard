@@ -104,6 +104,7 @@ namespace WinLockerGuard
             }
             try
             {
+                ScanProcesses();
                 ScanWindows();
                 long now = NowMs();
                 if (now - lastAutostartScan >= settings.AutostartScanSeconds * 1000L)
@@ -119,6 +120,45 @@ namespace WinLockerGuard
             finally
             {
                 Interlocked.Exchange(ref scanning, 0);
+            }
+        }
+
+        private void ScanProcesses()
+        {
+            Process[] all = Process.GetProcesses();
+            for (int i = 0; i < all.Length; i++)
+            {
+                Process p = all[i];
+                try
+                {
+                    string name = p.ProcessName;
+                    if (!Detect.LooksLikeBadName(name + ".exe"))
+                    {
+                        continue;
+                    }
+                    string path = null;
+                    try
+                    {
+                        path = p.MainModule.FileName;
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(path) || Detect.IsProtectedLocation(path) ||
+                        !Detect.IsUserWritable(path) || IsOwnPath(path))
+                    {
+                        continue;
+                    }
+                    Neutralize((uint)p.Id, "имя процесса: " + name);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    p.Dispose();
+                }
             }
         }
 
