@@ -16,6 +16,9 @@ Start-Sleep -Milliseconds 500
 & schtasks.exe /Delete /TN 'WinLockerGuard' /F 2>$null | Out-Null
 & schtasks.exe /Delete /TN 'WinLockerGuardWatchdog' /F 2>$null | Out-Null
 
+Get-Process WinLockerGuard -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Milliseconds 500
+
 $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 if (Test-Path $run) {
     Remove-ItemProperty -Path $run -Name 'WinLockerGuard' -ErrorAction SilentlyContinue

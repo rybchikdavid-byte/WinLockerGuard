@@ -79,7 +79,14 @@ namespace WinLockerGuard
             "все ваши файлы зашифрованы",
             "ваши файлы зашифрованы",
             "для разблокировки",
-            "to unlock your computer"
+            "to unlock your computer",
+            "вас заметили",
+            "тебя заметили",
+            "я тебя вижу",
+            "я вижу тебя",
+            "слежу за тобой",
+            "you have been noticed",
+            "i can see you"
         };
 
         private static readonly string[] LockWords =
@@ -111,7 +118,8 @@ namespace WinLockerGuard
         private static readonly string[] BadNameParts =
         {
             "winlock", "win-lock", "locker", "ransom", "cryptolocker", "cryptor",
-            "keylog", "smslock", "police", "trojan", "blocker"
+            "keylog", "smslock", "police", "trojan", "blocker",
+            "заметили", "тебя заметил", "слежк", "прикол", "noticed", "prank"
         };
 
         internal static bool LooksLikeLocker(string text, out bool veryStrong)

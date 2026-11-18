@@ -66,7 +66,9 @@ if (-not (Test-Path $ini)) {
         '# how often to check autostart, seconds',
         'AutostartScanSeconds=5',
         '# show tray icon',
-        'ShowTray=1'
+        'ShowTray=1',
+        '# kill fullscreen topmost windows with a black screen and no version info (prank "Vas zametili")',
+        'DetectPrankFullscreen=1'
     ) | Set-Content -Encoding ASCII $ini
 }
 

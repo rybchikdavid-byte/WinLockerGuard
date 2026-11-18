@@ -132,6 +132,7 @@ namespace WinLockerGuard
         public int ScanIntervalMs = 700;
         public int AutostartScanSeconds = 5;
         public bool ShowTray = true;
+        public bool DetectPrankFullscreen = true;
 
         public static Settings Load(string path)
         {
@@ -179,6 +180,10 @@ namespace WinLockerGuard
                         {
                             s.AutostartScanSeconds = Math.Max(2, Math.Min(3600, v));
                         }
+                    }
+                    else if (key == "detectprankfullscreen")
+                    {
+                        s.DetectPrankFullscreen = IsOn(val);
                     }
                 }
             }

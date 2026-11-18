@@ -237,11 +237,27 @@ namespace WinLockerGuard
                 uint candidate;
                 Native.GetWindowThreadProcessId(hwnd, out candidate);
                 string path = GetProcessPath(candidate);
-                if (!IsTempFullscreenExe(path))
+                if (string.IsNullOrEmpty(path) || Detect.IsProtectedLocation(path) ||
+                    !Detect.IsUserWritable(path) || IsOwnPath(path))
                 {
                     return;
                 }
-                reason = "полноэкранный exe из Temp без данных о версии: " + path;
+                bool badName = Detect.LooksLikeBadName(path);
+                bool hasInfo = HasVersionInfo(path);
+                if (hasInfo && !badName)
+                {
+                    return;
+                }
+                bool dark = settings.DetectPrankFullscreen && GuardVisual.IsMostlyDark(hwnd, r);
+                bool tempExe = IsTempFullscreenExe(path);
+                if (!badName && !dark && !tempExe)
+                {
+                    return;
+                }
+                reason = "полноэкранное окно поверх всех: " + path +
+                         (dark ? ", тёмный экран (пранк/винлокер)" : "") +
+                         (tempExe ? ", exe из Temp без версии" : "") +
+                         (badName ? ", подозрительное имя" : "");
             }
 
             uint pid;
@@ -279,6 +295,21 @@ namespace WinLockerGuard
             }
         }
 
+        private static bool HasVersionInfo(string path)
+        {
+            try
+            {
+                FileVersionInfo info = FileVersionInfo.GetVersionInfo(path);
+                return !string.IsNullOrEmpty(info.CompanyName) ||
+                       !string.IsNullOrEmpty(info.FileVersion) ||
+                       !string.IsNullOrEmpty(info.ProductName);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static bool IsTempFullscreenExe(string path)
         {
             if (string.IsNullOrEmpty(path) || Detect.IsProtectedLocation(path))
@@ -287,18 +318,7 @@ namespace WinLockerGuard
             }
             try
             {
-                if (!Detect.StartsWithDir(path, Path.GetTempPath()))
-                {
-                    return false;
-                }
-                FileVersionInfo info = FileVersionInfo.GetVersionInfo(path);
-                if (!string.IsNullOrEmpty(info.CompanyName) ||
-                    !string.IsNullOrEmpty(info.FileVersion) ||
-                    !string.IsNullOrEmpty(info.ProductName))
-                {
-                    return false;
-                }
-                return true;
+                return Detect.StartsWithDir(path, Path.GetTempPath()) && !HasVersionInfo(path);
             }
             catch
             {

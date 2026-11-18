@@ -15,7 +15,10 @@ jobs:
         run: |
           $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
           if (-not (Test-Path $csc)) { throw 'csc.exe not found' }
-          & $csc /nologo /target:winexe /optimize+ /codepage:65001 /out:WinLockerGuard.exe /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:Microsoft.CSharp.dll Program.cs Detect.cs Guard.cs GuardAutostart.cs
+          $sources = @(Get-ChildItem -Path . -Filter *.cs | Sort-Object Name | ForEach-Object { $_.Name })
+          $cscArgs = @('/nologo','/target:winexe','/optimize+','/codepage:65001','/out:WinLockerGuard.exe','/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll','/r:Microsoft.CSharp.dll')
+          $cscArgs += $sources
+          & $csc $cscArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload
