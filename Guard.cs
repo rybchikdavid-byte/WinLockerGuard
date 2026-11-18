@@ -19,7 +19,7 @@ namespace WinLockerGuard
         private readonly object logLock = new object();
         private readonly Dictionary<int, long> handled = new Dictionary<int, long>();
 
-        private Timer timer;
+        private System.Threading.Timer timer;
         private int scanning;
         private long lastAutostartScan;
 
@@ -80,7 +80,8 @@ namespace WinLockerGuard
             Log("Режим: " + (settings.PermanentDelete ? "удалять навсегда" : "карантин") +
                 ", интервал " + settings.ScanIntervalMs + " мс");
             ScanOnce();
-            timer = new Timer(Tick, null, settings.ScanIntervalMs, settings.ScanIntervalMs);
+            timer = new System.Threading.Timer(Tick, null, settings.ScanIntervalMs,
+                settings.ScanIntervalMs);
         }
 
         private void Tick(object state)
