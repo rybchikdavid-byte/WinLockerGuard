@@ -42,7 +42,13 @@ $cscArgs = @(
 $cscArgs += $sources
 & $csc $cscArgs
 if (-not (Test-Path $tempExe)) {
-    throw 'Compilation failed.'
+    $prebuilt = Join-Path $root 'WinLockerGuard.exe'
+    if (Test-Path $prebuilt) {
+        Write-Host 'Compiler failed, using prebuilt WinLockerGuard.exe.'
+        Copy-Item -Force $prebuilt $tempExe
+    } else {
+        throw 'Compilation failed and no prebuilt WinLockerGuard.exe found.'
+    }
 }
 
 Get-Process WinLockerGuard -ErrorAction SilentlyContinue | Stop-Process -Force

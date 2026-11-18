@@ -176,18 +176,32 @@ namespace WinLockerGuard
 
             bool topmost = Detect.IsTopmost(hwnd);
             string text = Detect.CollectWindowText(hwnd);
-            if (text.Length < 8)
+            bool veryStrong = false;
+            bool locker = text.Length >= 8 && Detect.LooksLikeLocker(text, out veryStrong);
+            string reason;
+
+            if (locker)
             {
-                return;
+                if (!topmost && !veryStrong)
+                {
+                    return;
+                }
+                reason = (topmost ? "topmost, " : "") + Truncate(text, 180);
             }
-            bool veryStrong;
-            if (!Detect.LooksLikeLocker(text, out veryStrong))
+            else
             {
-                return;
-            }
-            if (!topmost && !veryStrong)
-            {
-                return;
+                if (!topmost)
+                {
+                    return;
+                }
+                uint candidate;
+                Native.GetWindowThreadProcessId(hwnd, out candidate);
+                string path = GetProcessPath(candidate);
+                if (!IsTempFullscreenExe(path))
+                {
+                    return;
+                }
+                reason = "полноэкранный exe из Temp без данных о версии: " + path;
             }
 
             uint pid;
@@ -203,7 +217,53 @@ namespace WinLockerGuard
                     return;
                 }
             }
-            found.Add(new Detection(pid, (topmost ? "topmost, " : "") + Truncate(text, 180)));
+            found.Add(new Detection(pid, reason));
+        }
+
+        private static string GetProcessPath(uint pid)
+        {
+            if (pid == 0)
+            {
+                return null;
+            }
+            try
+            {
+                using (Process p = Process.GetProcessById((int)pid))
+                {
+                    return p.MainModule.FileName;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool IsTempFullscreenExe(string path)
+        {
+            if (string.IsNullOrEmpty(path) || Detect.IsProtectedLocation(path))
+            {
+                return false;
+            }
+            try
+            {
+                if (!Detect.StartsWithDir(path, Path.GetTempPath()))
+                {
+                    return false;
+                }
+                FileVersionInfo info = FileVersionInfo.GetVersionInfo(path);
+                if (!string.IsNullOrEmpty(info.CompanyName) ||
+                    !string.IsNullOrEmpty(info.FileVersion) ||
+                    !string.IsNullOrEmpty(info.ProductName))
+                {
+                    return false;
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void Neutralize(uint pid, string reason)
