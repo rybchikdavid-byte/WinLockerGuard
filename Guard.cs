@@ -75,7 +75,7 @@ namespace WinLockerGuard
 
         internal void Start()
         {
-            Log("===== WinLockerGuard запущен =====");
+            Log("===== Варгуард 1.2 запущен =====");
             Log("Windows " + Environment.OSVersion.VersionString + ", каталог " + baseDir);
             Log("Режим: " + (settings.PermanentDelete ? "удалять навсегда" : "карантин") +
                 ", интервал " + settings.ScanIntervalMs + " мс");
@@ -611,6 +611,43 @@ namespace WinLockerGuard
             }
         }
 
+        internal void Shutdown()
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                File.WriteAllText(Path.Combine(dir, "stopped.flag"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            }
+            catch
+            {
+            }
+            Log("Остановка по команде пользователя");
+            try
+            {
+                int me = Process.GetCurrentProcess().Id;
+                foreach (Process p in Process.GetProcessesByName("WinLockerGuard"))
+                {
+                    try
+                    {
+                        if (p.Id != me)
+                        {
+                            p.Kill();
+                        }
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        p.Dispose();
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
         internal int ClearQuarantine()
         {
             int count = 0;
@@ -728,7 +765,7 @@ namespace WinLockerGuard
                 timer.Dispose();
                 timer = null;
             }
-            Log("===== WinLockerGuard остановлен =====");
+            Log("===== Варгуард остановлен =====");
         }
 
         private sealed class Detection

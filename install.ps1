@@ -75,7 +75,7 @@ if (-not (Test-Path $ini)) {
 $quotedExe = '"' + $exe + '"'
 $taskCreated = $false
 try {
-    & schtasks.exe /Create /TN 'WinLockerGuard' /TR $quotedExe /SC ONLOGON /RL HIGHEST /F | Out-Null
+    & schtasks.exe /Create /TN 'WinLockerGuard' /TR ($quotedExe + ' --autostart') /SC ONLOGON /RL HIGHEST /F | Out-Null
     if ($LASTEXITCODE -eq 0) {
         $taskCreated = $true
     }
@@ -90,10 +90,10 @@ if (-not $taskCreated) {
     if (-not (Test-Path $run)) {
         New-Item -Path $run -Force | Out-Null
     }
-    Set-ItemProperty -Path $run -Name 'WinLockerGuard' -Value $quotedExe
+    Set-ItemProperty -Path $run -Name 'WinLockerGuard' -Value ($quotedExe + ' --autostart')
 }
 
-Start-Process -FilePath $exe
+Start-Process -FilePath $exe -ArgumentList '--autostart'
 Start-Sleep -Seconds 2
 
 Write-Host ''

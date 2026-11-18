@@ -36,9 +36,21 @@ if (Test-Path $ini) {
     Remove-Item -Force $ini -ErrorAction SilentlyContinue
 }
 
+# портативная копия (запуск без администратора)
+$user = Join-Path $env:LOCALAPPDATA 'WinLockerGuard'
+$userExe = Join-Path $user 'WinLockerGuard.exe'
+if (Test-Path $userExe) {
+    Remove-Item -Force $userExe -ErrorAction SilentlyContinue
+}
+$flag = Join-Path $user 'stopped.flag'
+if (Test-Path $flag) {
+    Remove-Item -Force $flag -ErrorAction SilentlyContinue
+}
+
 Write-Host ''
 Write-Host 'WinLockerGuard removed.'
-Write-Host ('Quarantine kept at: ' + (Join-Path $dest 'Quarantine'))
-Write-Host 'Delete that folder yourself if you do not need the quarantined files.'
+Write-Host ('Logs and quarantine kept at: ' + $dest)
+Write-Host ('Portable leftovers: ' + $user)
+Write-Host 'Delete those folders yourself if you do not need the logs or quarantined files.'
 Write-Host ''
 Read-Host 'Press Enter to close'
