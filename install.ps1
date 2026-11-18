@@ -67,8 +67,10 @@ if (-not (Test-Path $ini)) {
         'AutostartScanSeconds=5',
         '# show tray icon',
         'ShowTray=1',
-        '# kill fullscreen topmost windows with a black screen and no version info (prank "Vas zametili")',
-        'DetectPrankFullscreen=1'
+        '# ловить чёрные полноэкранные пранки без текста («Вас заметили»)',
+        'DetectPrankFullscreen=1',
+        '# жёсткий режим: гасить неподписанные exe из Temp, Downloads и AppData',
+        'Aggressive=1'
     ) | Set-Content -Encoding ASCII $ini
 }
 

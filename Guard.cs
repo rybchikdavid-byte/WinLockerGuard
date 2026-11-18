@@ -14,18 +14,27 @@ namespace WinLockerGuard
     {
         private readonly Settings settings;
         private readonly string baseDir;
+        private readonly string exeDir;
         private readonly string quarantineDir;
         private readonly string logPath;
         private readonly object logLock = new object();
         private readonly Dictionary<int, long> handled = new Dictionary<int, long>();
+        private readonly Dictionary<string, bool> signedCache = new Dictionary<string, bool>();
+        private readonly Dictionary<string, DateTime> signedStamp = new Dictionary<string, DateTime>();
+        private readonly List<string> allow = new List<string>();
 
         private System.Threading.Timer timer;
         private int scanning;
         private long lastAutostartScan;
+        private long lastProcessScan;
+        private long lastAllowLoad;
+        private long pausedUntil;
+        private readonly int myPid = Process.GetCurrentProcess().Id;
 
         internal Guard()
         {
-            string exeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string dirExe = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            exeDir = dirExe;
             settings = Settings.Load(Path.Combine(exeDir, "settings.ini"));
 
             string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -75,7 +84,7 @@ namespace WinLockerGuard
 
         internal void Start()
         {
-            Log("===== Варгуард 1.2 запущен =====");
+            Log("===== Варгуард 1.3 запущен =====");
             Log("Windows " + Environment.OSVersion.VersionString + ", каталог " + baseDir);
             Log("Режим: " + (settings.PermanentDelete ? "удалять навсегда" : "карантин") +
                 ", интервал " + settings.ScanIntervalMs + " мс");
@@ -104,6 +113,10 @@ namespace WinLockerGuard
             }
             try
             {
+                if (IsPaused)
+                {
+                    return;
+                }
                 ScanProcesses();
                 ScanWindows();
                 long now = NowMs();
@@ -125,18 +138,25 @@ namespace WinLockerGuard
 
         private void ScanProcesses()
         {
+            long now = NowMs();
+            if (now - lastProcessScan < 2000L)
+            {
+                return;
+            }
+            lastProcessScan = now;
+
             Process[] all = Process.GetProcesses();
             for (int i = 0; i < all.Length; i++)
             {
                 Process p = all[i];
                 try
                 {
-                    string name = p.ProcessName;
-                    if (!Detect.LooksLikeBadName(name + ".exe"))
+                    if (p.Id <= 4 || p.Id == myPid)
                     {
                         continue;
                     }
-                    string path = null;
+                    string name = p.ProcessName;
+                    string path;
                     try
                     {
                         path = p.MainModule.FileName;
@@ -146,11 +166,44 @@ namespace WinLockerGuard
                         continue;
                     }
                     if (string.IsNullOrEmpty(path) || Detect.IsProtectedLocation(path) ||
-                        !Detect.IsUserWritable(path) || IsOwnPath(path))
+                        IsOwnPath(path) || IsAllowlisted(name, path))
                     {
                         continue;
                     }
-                    Neutralize((uint)p.Id, "имя процесса: " + name);
+
+                    if (Detect.LooksLikeBadName(name + ".exe") || Detect.LooksLikeBadName(path))
+                    {
+                        Neutralize((uint)p.Id, "имя процесса: " + name + " (" + path + ")");
+                        continue;
+                    }
+
+                    if (!settings.Aggressive || !Detect.IsUserWritable(path))
+                    {
+                        continue;
+                    }
+                    if (IsSignedCached(path))
+                    {
+                        continue;
+                    }
+
+                    string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    string commonAppData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+
+                    bool fromTemp = Detect.StartsWithDir(path, Path.GetTempPath());
+                    bool underProfile = Detect.StartsWithDir(path, profile);
+                    bool underAppData = Detect.StartsWithDir(path, appData) ||
+                                        Detect.StartsWithDir(path, localAppData) ||
+                                        Detect.StartsWithDir(path, commonAppData);
+
+                    if (fromTemp || (underProfile && !underAppData) || !HasVersionInfo(path))
+                    {
+                        Neutralize((uint)p.Id,
+                            "неподписанный exe" +
+                            (fromTemp ? " из Temp" : underProfile && !underAppData ? " из пользовательской папки" : " без данных о версии") +
+                            ": " + path);
+                    }
                 }
                 catch
                 {
@@ -160,6 +213,118 @@ namespace WinLockerGuard
                     p.Dispose();
                 }
             }
+        }
+
+        private bool IsSignedCached(string path)
+        {
+            DateTime stamp;
+            try
+            {
+                stamp = File.GetLastWriteTimeUtc(path);
+            }
+            catch
+            {
+                return false;
+            }
+            lock (signedCache)
+            {
+                DateTime old;
+                bool known;
+                if (signedStamp.TryGetValue(path, out old) && old == stamp &&
+                    signedCache.TryGetValue(path, out known))
+                {
+                    return known;
+                }
+                bool signed = Detect.IsSigned(path);
+                signedStamp[path] = stamp;
+                signedCache[path] = signed;
+                if (signedCache.Count > 4096)
+                {
+                    signedCache.Clear();
+                    signedStamp.Clear();
+                }
+                return signed;
+            }
+        }
+
+        private void LoadAllowList()
+        {
+            long now = NowMs();
+            if (now - lastAllowLoad < 5000L)
+            {
+                return;
+            }
+            lastAllowLoad = now;
+            allow.Clear();
+            try
+            {
+                string file = Path.Combine(exeDir, "allow.txt");
+                if (!File.Exists(file))
+                {
+                    return;
+                }
+                foreach (string raw in File.ReadAllLines(file))
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";"))
+                    {
+                        continue;
+                    }
+                    allow.Add(line.ToLowerInvariant());
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private bool IsAllowlisted(string name, string path)
+        {
+            LoadAllowList();
+            if (allow.Count == 0)
+            {
+                return false;
+            }
+            string n = (name ?? "").ToLowerInvariant();
+            if (!n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                n = n + ".exe";
+            }
+            string p = (path ?? "").ToLowerInvariant();
+            for (int i = 0; i < allow.Count; i++)
+            {
+                string a = allow[i];
+                if (a == n || a == p)
+                {
+                    return true;
+                }
+                if (a.EndsWith("\\") && p.StartsWith(a, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+                if (a.IndexOf('\\') >= 0 && p.StartsWith(a, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal void Pause(int minutes)
+        {
+            pausedUntil = NowMs() + minutes * 60000L;
+            Log("Пауза защиты на " + minutes + " мин (установка программ)");
+        }
+
+        internal void Resume()
+        {
+            pausedUntil = 0;
+            Log("Защита продолжена");
+        }
+
+        internal bool IsPaused
+        {
+            get { return NowMs() < pausedUntil; }
         }
 
         private void ScanWindows()

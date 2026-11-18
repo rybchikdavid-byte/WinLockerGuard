@@ -14,7 +14,7 @@ namespace WinLockerGuard
     {
         private const string MutexName = @"Local\WinLockerGuard_v1";
         private const string WatchdogMutexName = @"Local\WinLockerGuard_watchdog_v1";
-        private const string Version = "1.2";
+        private const string Version = "1.3";
 
         [STAThread]
         private static void Main(string[] args)
@@ -376,6 +376,8 @@ namespace WinLockerGuard
             menu.Items.Add("Журнал", null, delegate { Open(guard.LogPath); });
             menu.Items.Add("Карантин", null, delegate { Open(guard.QuarantineDir); });
             menu.Items.Add("Очистить карантин", null, delegate { ClearQuarantine(); });
+            menu.Items.Add("Пауза 5 минут", null, delegate { guard.Pause(5); });
+            menu.Items.Add("Продолжить", null, delegate { guard.Resume(); });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Выход (остановить защиту)", null, delegate
             {
@@ -447,6 +449,7 @@ namespace WinLockerGuard
         public int AutostartScanSeconds = 5;
         public bool ShowTray = true;
         public bool DetectPrankFullscreen = true;
+        public bool Aggressive = true;
 
         public static Settings Load(string path)
         {
@@ -498,6 +501,10 @@ namespace WinLockerGuard
                     else if (key == "detectprankfullscreen")
                     {
                         s.DetectPrankFullscreen = IsOn(val);
+                    }
+                    else if (key == "aggressive")
+                    {
+                        s.Aggressive = IsOn(val);
                     }
                 }
             }

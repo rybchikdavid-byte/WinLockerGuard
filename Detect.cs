@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -158,6 +159,23 @@ namespace WinLockerGuard
                 }
             }
             return false;
+        }
+
+        internal static bool IsSigned(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                return false;
+            }
+            try
+            {
+                X509Certificate.CreateFromSignedFile(path);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static bool LooksLikeBadName(string path)
